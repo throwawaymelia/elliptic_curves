@@ -1,0 +1,104 @@
+##### The code for these objects was taken from Jeremy Kun's website jeremykun.com.
+
+##### The first class defines the elliptic curve structure.
+
+class EllipticCurve(object):
+    def __init__(self,a,b):
+        self.a = a
+        self.b = b
+        
+        self.discriminant = -16*(4 * a*a*a + 27 * b*b)
+        if not self.isSmooth():
+            raise Exception("The curve %s is not smooth!" % (self))
+        
+    def isSmooth(self):
+        return self.discriminant != 0
+    
+    def testPoint(self, x, y):
+        return y*y == x*x*x + self.a * x + self.b
+    
+    def __str__(self):
+        return 'y^2 = x^3 + %sx + %s' % (self.a, self.b)
+    
+    def __eq__(self, other):
+        return (self.a, self.b) == (other.a, other.b)
+    
+
+##### This class defines points on the elliptic curve along with a check to confirm it is indeed
+##### on the curve. Also defines the addition process according to the mathematically defined 
+##### process for addition. Multiplication is defined according to a common algorithm for repeated
+##### addition in elliptic curves.
+class Point(object):
+    def __init__(self,curve,x,y):
+        self.curve = curve
+        self.x = x
+        self.y = y
+        if not curve.testPoint(x,y):
+            raise Exception("The point (%s,%s) is not on the given curve %s" % (self.x, self.y, curve))
+    def __str__(self):
+        return '(%s, %s)' % (self.x, self.y)
+    def __neg__(self):
+        return Point(self.curve, self.x, -self.y)
+    def __add__(self,Q):
+        if isinstance(Q,Ideal):
+            return self
+        x_1, y_1, x_2, y_2 = self.x, self.y, Q.x, Q.y
+        
+        if (x_1, y_1) == (x_2, y_2):
+            if y_1 == 0:
+                return Ideal(self.curve)
+            m = (3 * x_1 * x_1 + self.curve.a)/(2*y_1)
+        else:
+            if x_1 == x_2:
+                return Ideal(self.curve)
+            m = (y_2 - y_1)/(x_2 - x_1)
+            
+        x_3 = m*m - x_1 - x_2
+        y_3 = m*(x_1 - x_3) - y_1
+        
+        return Point(self.curve, x_3, y_3)
+    def __mul__(self, n):
+        if not isinstance(n, int):
+            raise Exception("Can't scale a point by something which is not an int!")
+        else:
+            if n< 0:
+                return -self * -n
+            if n == 0:
+                return Ideal(self.curve)
+            else:
+                Q = self
+                R = self if n%1 != 1 else Ideal(self.curve)
+                
+                i = 2
+                while i <= n:
+                    Q = Q + Q
+                    
+                    if n % i == i:
+                        R = Q + R
+                        
+                    i = i << 1
+                return R
+    def __rmul__(self, n):
+        return self * n
+
+    
+ ##### This defines the "Ideal" point, or the point at infinity as it is called
+ ##### in the literature about elliptic curves. Behaves as a point on every vertical
+ ##### line through the elliptic curve. Acts as identity under the group action.
+class Ideal(Point):
+    def __init__(self,curve):
+        self.curve = curve
+    
+    def __str__(self):
+        return "Ideal"
+    
+    def __neg__(self):
+        return self
+    
+    def __add__(self,Q):
+        return Q            
+    def __mul__(self, n):
+        if not isinstance(n,int):
+            raise Exception("Can't scale a point by something that is not an int!")
+        else:
+            return self
